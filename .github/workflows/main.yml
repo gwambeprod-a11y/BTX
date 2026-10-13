@@ -1,0 +1,89 @@
+name: Compiler BATIX Android APK Automatiquement
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-batix-apk:
+    name: Générer le fichier BATIX.apk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Récupération du code du dépôt
+        uses: actions/checkout@v4
+
+      - name: 2. Installation de Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 3. Installation de Java JDK 17 (requis pour Android Gradle)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 4. Configuration du SDK Android
+        uses: android-actions/setup-android@v3
+
+      - name: 5. Préparation automatique du projet Capacitor Android
+        run: |
+          mkdir -p batix-build/www
+          if [ -f "BATIX_Marketplace_App.html" ]; then
+            cp BATIX_Marketplace_App.html batix-build/www/index.html
+          elif [ -f "index.html" ]; then
+            cp index.html batix-build/www/index.html
+          elif [ -f "mobile-capacitor-apk/www/index.html" ]; then
+            cp mobile-capacitor-apk/www/index.html batix-build/www/index.html
+          else
+            echo "<h1>BATIX App</h1>" > batix-build/www/index.html
+          fi
+
+          cd batix-build
+          cat << 'EOF' > package.json
+          {
+            "name": "batix-mobile-app",
+            "version": "3.3.0",
+            "description": "BATIX Marketplace BTP & Livraison Express",
+            "main": "www/index.html",
+            "dependencies": {
+              "@capacitor/android": "^6.1.0",
+              "@capacitor/core": "^6.1.0"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "^6.1.0"
+            }
+          }
+          EOF
+
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "cm.batix.app",
+            "appName": "BATIX",
+            "webDir": "www",
+            "bundledWebRuntime": false,
+            "server": {
+              "androidScheme": "https"
+            }
+          }
+          EOF
+
+          npm install
+          npx cap add android
+          npx cap sync android
+
+      - name: 6. Compilation de l'exécutable Android (.APK)
+        run: |
+          cd batix-build/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../../BATIX-v3.3-Android.apk
+
+      - name: 7. Publication du fichier BATIX-v3.3-Android.apk prêt à télécharger
+        uses: actions/upload-artifact@v4
+        with:
+          name: BATIX-Android-APK
+          path: BATIX-v3.3-Android.apk
+          if-no-files-found: error
