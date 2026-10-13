@@ -1,0 +1,23 @@
+{
+  "name": "BATIX — Approvisionnement & Livraison BTP",
+  "short_name": "BATIX",
+  "description": "Plateforme d'approvisionnement et de livraison certifiée de matériaux de construction à Yaoundé (Cameroun)",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1322",
+  "theme_color": "#f59e0b",
+  "lang": "fr-CM",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

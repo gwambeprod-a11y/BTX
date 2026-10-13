@@ -1,0 +1,55 @@
+version: '3.9'
+
+# Conforme à la Section 20.1 et 20.6 du Cahier des Charges BATIX v3.1
+services:
+  postgres-postgis:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: batix-postgres
+    environment:
+      POSTGRES_USER: batix_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-batix_dev_secret_2026}
+      POSTGRES_DB: batix_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./backend-go/migrations:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: batix-redis
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    container_name: batix-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: batix_minio
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET:-batix_minio_secret_2026}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
+  batix-core-api:
+    build:
+      context: ./backend-go
+    container_name: batix-core-api
+    environment:
+      DATABASE_URL: postgres://batix_user:batix_dev_secret_2026@postgres-postgis:5432/batix_db?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres-postgis
+      - redis
+      - minio
+
+volumes:
+  pgdata:
+  miniodata:
