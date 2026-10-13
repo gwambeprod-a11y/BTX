@@ -7,41 +7,49 @@ on:
 
 jobs:
   build-batix-apk:
-    name: Générer le fichier BATIX.apk
+    name: Générer le fichier BATIX.apk (Node 24 & Java v5)
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Récupération du code du dépôt
-        uses: actions/checkout@v4
+      - name: 1. Récupération du code du dépôt (Node 24)
+        uses: actions/checkout@v5
 
-      - name: 2. Installation de Node.js 20
-        uses: actions/setup-node@v4
+      - name: 2. Installation de Node.js 24 (sans cache lockfile)
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: '24'
+          package-manager-cache: false
 
-      - name: 3. Installation de Java JDK 17 (requis pour Android Gradle)
-        uses: actions/setup-java@v4
+      - name: 3. Installation de Java JDK 17 (setup-java v5)
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 4. Configuration du SDK Android
-        uses: android-actions/setup-android@v3
+      - name: 4. Configuration du SDK Android natif (Sans action Node 20 dépréciée)
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
 
       - name: 5. Préparation automatique du projet Capacitor Android
         run: |
+          rm -rf batix-build
           mkdir -p batix-build/www
-          if [ -f "BATIX_Marketplace_App.html" ]; then
-            cp BATIX_Marketplace_App.html batix-build/www/index.html
-          elif [ -f "index.html" ]; then
-            cp index.html batix-build/www/index.html
-          elif [ -f "mobile-capacitor-apk/www/index.html" ]; then
-            cp mobile-capacitor-apk/www/index.html batix-build/www/index.html
+
+          HTML_FILE=$(find . -maxdepth 3 \( -name "BATIX_Marketplace_App.html" -o -name "BATIX_App_Interactive.html" -o -name "index.html" \) ! -path "./batix-build/*" | head -n 1)
+          if [ -n "$HTML_FILE" ]; then
+            echo "Fichier d'application trouvé : $HTML_FILE"
+            cp "$HTML_FILE" batix-build/www/index.html
           else
-            echo "<h1>BATIX App</h1>" > batix-build/www/index.html
+            echo "Création d'un index.html de secours..."
+            echo "<!DOCTYPE html><html><head><meta charset='utf-8'><title>BATIX</title></head><body><h1>BATIX</h1></body></html>" > batix-build/www/index.html
           fi
 
           cd batix-build
+
           cat << 'EOF' > package.json
           {
             "name": "batix-mobile-app",
@@ -70,19 +78,21 @@ jobs:
           }
           EOF
 
-          npm install
+          npm install --no-audit --no-fund
           npx cap add android
           npx cap sync android
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
       - name: 6. Compilation de l'exécutable Android (.APK)
         run: |
           cd batix-build/android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../../BATIX-v3.3-Android.apk
+          ls -lh ../../BATIX-v3.3-Android.apk
 
-      - name: 7. Publication du fichier BATIX-v3.3-Android.apk prêt à télécharger
-        uses: actions/upload-artifact@v4
+      - name: 7. Publication du fichier BATIX-v3.3-Android.apk (Node 24)
+        uses: actions/upload-artifact@v6
         with:
           name: BATIX-Android-APK
           path: BATIX-v3.3-Android.apk
